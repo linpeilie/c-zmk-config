@@ -12,6 +12,11 @@
         zmk,physical-layout = &physical_layout0;
     };
 
+    iqs550_listener: iqs550_listener {
+        compatible = "zmk,input-listener";
+        device = <&iqs550>;
+    };
+
     default_transform: keymap_transform_0 {
         compatible = "zmk,matrix-transform";
         columns = <6>;
@@ -63,4 +68,25 @@
 
 &pro_micro_i2c {
     status = "okay";
+
+    // The current PCB only routes SDA/SCL/3V3/GND to the FPC trackpad connector,
+    // so the IQS550 is configured without RDY/NRST and uses polling mode.
+    iqs550: iqs5xx@74 {
+        compatible = "azoteq,iqs5xx";
+        reg = <0x74>;
+        status = "okay";
+
+        one-finger-tap;
+        press-and-hold;
+        press-and-hold-time = <250>;
+        two-finger-tap;
+
+        scroll;
+        natural-scroll-x;
+        natural-scroll-y;
+
+        bottom-beta = <5>;
+        stationary-threshold = <5>;
+        poll-interval-ms = <12>;
+    };
 };

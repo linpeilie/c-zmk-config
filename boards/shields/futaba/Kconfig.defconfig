@@ -3,4 +3,7 @@ if SHIELD_FUTABA
 config ZMK_KEYBOARD_NAME
     default "Futaba"
 
+config ZMK_POINTING
+    default y
+
 endif
