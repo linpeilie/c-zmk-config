@@ -6,4 +6,7 @@ config ZMK_KEYBOARD_NAME
 config ZMK_POINTING
     default y
 
+config I2C
+    default y
+
 endif
