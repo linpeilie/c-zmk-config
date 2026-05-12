@@ -1,0 +1,6 @@
+if SHIELD_FUTABA
+
+config ZMK_KEYBOARD_NAME
+    default "Futaba"
+
+endif

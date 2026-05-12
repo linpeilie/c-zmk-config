@@ -1,0 +1,58 @@
+/*
+ * Copyright (c) 2026
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/keys.h>
+
+#define NAV 1
+#define NUM 2
+
+#define L_NUM &lt NUM SPACE
+#define R_NUM &lt NUM ENTER
+#define L_LANG &mt LSHFT LANG2
+#define R_LANG &mt RSHFT LANG1
+
+&lt {
+    quick-tap-ms = <200>;
+};
+
+&mt {
+    quick-tap-ms = <200>;
+};
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            bindings = <
+                &kp ESC   &kp Q     &kp W      &kp E      &kp R      &kp T         &kp MINUS &kp P      &kp O      &kp I       &kp U      &kp Y
+                &kp TAB   &kp A     &kp S      &kp D      &kp F      &kp G         &kp SQT   &kp SEMI   &kp L      &kp K       &kp J      &kp H
+                &kp LCTRL &kp Z     &kp X      &kp C      &kp V      &kp B         &kp BSLH  &kp FSLH   &kp DOT    &kp COMMA   &kp M      &kp N
+                         &kp LGUI  &kp LALT  L_LANG     L_NUM      &mo NAV      &kp DEL   &kp F5     &kp F2      &kp RBKT   &kp LBKT   R_LANG   R_NUM    &mo NAV
+            >;
+        };
+
+        nav_layer {
+            bindings = <
+                &trans    &trans    &trans     &trans     &trans     &trans        &trans    &trans     &kp END    &kp PG_UP   &kp PG_DN  &kp HOME
+                &trans    &trans    &trans     &trans     &trans     &trans        &trans    &trans     &kp RIGHT  &kp UP      &kp DOWN   &kp LEFT
+                &trans    &trans    &trans     &trans     &trans     &trans        &trans    &trans     &kp RBKT   &kp LBKT    &kp RBRC   &kp LBRC
+                         &trans    &trans    &trans     &trans     &trans        &bt BT_CLR &sys_reset &bootloader &trans     &trans     &trans    &kp BSPC  &trans
+            >;
+        };
+
+        num_layer {
+            bindings = <
+                &kp TILDE &kp EXCL  &kp AT     &kp HASH   &kp DLLR   &kp PRCNT      &kp PLUS  &kp RPAR   &kp LPAR   &kp STAR    &kp AMPS   &kp CARET
+                &kp GRAVE &kp N1    &kp N2     &kp N3     &kp N4     &kp N5         &kp EQUAL &kp N0     &kp N9     &kp N8      &kp N7     &kp N6
+                &kp F11   &kp F1    &kp F2     &kp F3     &kp F4     &kp F5         &kp F12   &kp F10    &kp F9     &kp F8      &kp F7     &kp F6
+                         &trans    &trans    &trans     &trans     &trans        &kp C_PREV &kp C_PP   &kp C_NEXT  &trans     &trans     &trans    &trans    &trans
+            >;
+        };
+    };
+};
