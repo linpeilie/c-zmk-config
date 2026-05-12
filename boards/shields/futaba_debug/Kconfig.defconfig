@@ -1,0 +1,9 @@
+if SHIELD_FUTABA_DEBUG
+
+config ZMK_KEYBOARD_NAME
+    default "Futaba Debug"
+
+config I2C
+    default n
+
+endif
