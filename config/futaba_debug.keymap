@@ -13,10 +13,7 @@
 
         debug_layer {
             bindings = <
-                &none    &none    &none    &none    &none    &none      &none    &none    &none    &none    &none    &none
-                &none    &none    &none    &none    &none    &none      &none    &none    &none    &none    &none    &none
-                &none    &none    &none    &none    &none    &none      &none    &none    &none    &none    &none    &none
-                         &none    &none    &none    &none    &none      &kp A    &kp B    &kp C    &none    &none    &none    &none    &none
+                &kp A    &kp B    &kp C
             >;
         };
     };
