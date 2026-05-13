@@ -101,13 +101,23 @@ static int iqs5xx_wait_for_bootloader(const struct device *dev, uint8_t *version
     const struct iqs5xx_config *config = dev->config;
     uint16_t bl_addr = config->i2c.addr ^ IQS5XX_BL_ADDR_XOR;
     int ret = -ETIMEDOUT;
+    uint16_t interval_ms = config->bootloader_poll_interval_ms;
 
-    for (uint16_t elapsed = 0; elapsed < timeout_ms; elapsed += 10) {
+    if (interval_ms == 0) {
+        interval_ms = 100;
+    }
+
+    for (uint16_t elapsed = 0; elapsed < timeout_ms; elapsed += interval_ms) {
         ret = iqs5xx_bl_read_cmd(config, bl_addr, IQS5XX_BL_CMD_VERSION, version, 2);
         if (ret == 0) {
             return 0;
         }
-        k_msleep(10);
+
+        if (elapsed == 0 || (elapsed % 1000) == 0) {
+            LOG_WRN("IQS5xx bootloader poll failed at 0x%02x: %d", bl_addr, ret);
+        }
+
+        k_msleep(interval_ms);
     }
 
     return ret < 0 ? ret : -ETIMEDOUT;
@@ -671,6 +681,7 @@ static int iqs5xx_init(const struct device *dev) {
         .force_firmware_update = DT_INST_PROP(n, force_firmware_update),                             \
         .firmware_program_delay_ms = DT_INST_PROP_OR(n, firmware_program_delay_ms, 5000),             \
         .bootloader_poll_timeout_ms = DT_INST_PROP_OR(n, bootloader_poll_timeout_ms, 1000),           \
+        .bootloader_poll_interval_ms = DT_INST_PROP_OR(n, bootloader_poll_interval_ms, 100),          \
     };                                                                                                \
     DEVICE_DT_INST_DEFINE(n, iqs5xx_init, NULL, &iqs5xx_data_##n, &iqs5xx_config_##n, POST_KERNEL,  \
                           CONFIG_INPUT_INIT_PRIORITY, NULL);

@@ -160,6 +160,7 @@ struct iqs5xx_config {
     bool force_firmware_update;
     uint16_t firmware_program_delay_ms;
     uint16_t bootloader_poll_timeout_ms;
+    uint16_t bootloader_poll_interval_ms;
 };
 
 struct iqs5xx_data {

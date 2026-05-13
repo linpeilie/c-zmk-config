@@ -96,3 +96,10 @@ properties:
       reset GPIO is available. Use a long value to allow manually toggling the
       IQS550 NRST pin after USB serial logging is connected.
     default: 1000
+
+  bootloader-poll-interval-ms:
+    type: int
+    description: |
+      Delay between bootloader poll attempts. Increase this on bring-up builds
+      to keep physical I2C line faults readable in USB logs.
+    default: 100

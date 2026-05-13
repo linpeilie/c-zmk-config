@@ -37,6 +37,9 @@ area and skips reprogramming when it already matches the bundled image.
 
 ## Failure hints
 
+- If logs show `i2c_nrfx_twi: Error on I2C line`, stop treating it as a
+  firmware/protocol problem. This means the nRF52840 I2C peripheral sees an
+  electrical bus fault on SDA/SCL.
 - If the log shows bootloader entry failure, power-cycle the keyboard while the
   writer firmware is already running.
 - If USB serial is already connected, a better test is to briefly short the
