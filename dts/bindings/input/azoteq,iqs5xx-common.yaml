@@ -81,3 +81,18 @@ properties:
     description: |
       Program the bundled firmware even if the non-volatile configuration area
       already matches the bundled GR-Trackpad65 image.
+
+  firmware-program-delay-ms:
+    type: int
+    description: |
+      Delay before starting one-shot firmware programming. This lets USB logging
+      enumerate before the writer performs long bootloader/I2C operations.
+    default: 5000
+
+  bootloader-poll-timeout-ms:
+    type: int
+    description: |
+      How long the one-shot writer polls the IQS5xx bootloader address when no
+      reset GPIO is available. Use a long value to allow manually toggling the
+      IQS550 NRST pin after USB serial logging is connected.
+    default: 1000

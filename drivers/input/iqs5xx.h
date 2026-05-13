@@ -158,6 +158,8 @@ struct iqs5xx_config {
 
     bool program_firmware;
     bool force_firmware_update;
+    uint16_t firmware_program_delay_ms;
+    uint16_t bootloader_poll_timeout_ms;
 };
 
 struct iqs5xx_data {
@@ -166,6 +168,7 @@ struct iqs5xx_data {
     struct k_work work;
     struct k_work_delayable poll_work;
     struct k_work_delayable button_release_work;
+    struct k_work_delayable firmware_program_work;
     // TODO: Pack flags into a bitfield to save space.
     bool initialized;
     // Flag to indicate if the button was pressed in a previous cycle.

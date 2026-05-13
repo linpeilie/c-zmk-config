@@ -126,17 +126,23 @@ static int iqs5xx_enter_bootloader(const struct device *dev, uint8_t *version) {
             return 0;
         }
     } else {
-        ret = iqs5xx_wait_for_bootloader(dev, version, 100);
+        LOG_INF("No IQS5xx reset GPIO; polling bootloader for %u ms",
+                config->bootloader_poll_timeout_ms);
+        ret = iqs5xx_wait_for_bootloader(dev, version, config->bootloader_poll_timeout_ms);
         if (ret == 0) {
             return 0;
         }
 
+        LOG_INF("Bootloader not seen; trying IQS5xx software reset through app address 0x%02x",
+                config->i2c.addr);
         ret = iqs5xx_write_reg8(dev, IQS5XX_SYSTEM_CONTROL_1, IQS5XX_RESET);
         if (ret == 0) {
             (void)iqs5xx_end_comm_window(dev);
+        } else {
+            LOG_WRN("IQS5xx software reset command failed: %d", ret);
         }
 
-        ret = iqs5xx_wait_for_bootloader(dev, version, 1000);
+        ret = iqs5xx_wait_for_bootloader(dev, version, config->bootloader_poll_timeout_ms);
         if (ret == 0) {
             return 0;
         }
@@ -250,6 +256,23 @@ static int iqs5xx_program_gr_trackpad65_firmware(const struct device *dev) {
 
     k_msleep(100);
     return 0;
+}
+
+static void iqs5xx_firmware_program_work_handler(struct k_work *work) {
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct iqs5xx_data *data = CONTAINER_OF(dwork, struct iqs5xx_data, firmware_program_work);
+    int ret;
+
+    LOG_INF("Starting delayed GR-Trackpad65 IQS550 firmware writer");
+
+    ret = iqs5xx_program_gr_trackpad65_firmware(data->dev);
+    if (ret < 0) {
+        LOG_ERR("GR-Trackpad65 IQS550 firmware writer failed: %d", ret);
+        LOG_ERR("Check FFC orientation, VCC/GND, SDA/SCL continuity, and IQS550 NRST/RDY access");
+        return;
+    }
+
+    LOG_INF("GR-Trackpad65 IQS550 firmware writer finished; flash normal futaba firmware now");
 }
 
 static void iqs5xx_button_release_work_handler(struct k_work *work) {
@@ -542,6 +565,7 @@ static int iqs5xx_init(const struct device *dev) {
     k_work_init(&data->work, iqs5xx_work_handler);
     k_work_init_delayable(&data->poll_work, iqs5xx_poll_work_handler);
     k_work_init_delayable(&data->button_release_work, iqs5xx_button_release_work_handler);
+    k_work_init_delayable(&data->firmware_program_work, iqs5xx_firmware_program_work_handler);
 
     // Configure reset GPIO if available.
     if (config->reset_gpio.port) {
@@ -564,11 +588,10 @@ static int iqs5xx_init(const struct device *dev) {
     }
 
     if (config->program_firmware) {
-        ret = iqs5xx_program_gr_trackpad65_firmware(dev);
-        if (ret < 0) {
-            LOG_ERR("Failed to program GR-Trackpad65 firmware: %d", ret);
-            return ret;
-        }
+        LOG_INF("GR-Trackpad65 writer enabled; programming starts in %u ms",
+                config->firmware_program_delay_ms);
+        k_work_schedule(&data->firmware_program_work, K_MSEC(config->firmware_program_delay_ms));
+        return 0;
     }
 
     if (config->rdy_gpio.port) {
@@ -646,6 +669,8 @@ static int iqs5xx_init(const struct device *dev) {
         .poll_interval_ms = DT_INST_PROP_OR(n, poll_interval_ms, 12),                                \
         .program_firmware = DT_INST_PROP(n, program_firmware),                                       \
         .force_firmware_update = DT_INST_PROP(n, force_firmware_update),                             \
+        .firmware_program_delay_ms = DT_INST_PROP_OR(n, firmware_program_delay_ms, 5000),             \
+        .bootloader_poll_timeout_ms = DT_INST_PROP_OR(n, bootloader_poll_timeout_ms, 1000),           \
     };                                                                                                \
     DEVICE_DT_INST_DEFINE(n, iqs5xx_init, NULL, &iqs5xx_data_##n, &iqs5xx_config_##n, POST_KERNEL,  \
                           CONFIG_INPUT_INIT_PRIORITY, NULL);

@@ -7,4 +7,6 @@
 
 &iqs550 {
     program-firmware;
+    firmware-program-delay-ms = <5000>;
+    bootloader-poll-timeout-ms = <30000>;
 };
