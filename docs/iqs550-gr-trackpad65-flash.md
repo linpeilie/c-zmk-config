@@ -16,6 +16,11 @@ artifact-name: futaba_iqs550_flash
 The target reuses the normal `futaba` keyboard shield and overlays
 `program-firmware` on the `iqs550` node. It also enables USB logging.
 
+The Futaba PCB routes the trackpad FFC SDA/SCL nets to nice!nano pads `20/21`,
+which are nRF52840 `P0.29/P0.31`. The shield overrides nice!nano's default
+Pro Micro I2C pins because those defaults are `P0.17/P0.20` and do not reach
+the trackpad connector on this PCB.
+
 ## Flash procedure
 
 1. Flash the `futaba_iqs550_flash` UF2 to the nRF52840.

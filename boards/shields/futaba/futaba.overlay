@@ -5,6 +5,7 @@
  */
 
 #include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/pinctrl/nrf-pinctrl.h>
 
 / {
     chosen {
@@ -66,8 +67,30 @@
     };
 };
 
+&pinctrl {
+    futaba_i2c0_default: futaba_i2c0_default {
+        group1 {
+            // The PCB routes the trackpad FFC SDA/SCL to nice!nano pads 20/21.
+            psels = <NRF_PSEL(TWIM_SDA, 0, 29)>,
+                    <NRF_PSEL(TWIM_SCL, 0, 31)>;
+        };
+    };
+
+    futaba_i2c0_sleep: futaba_i2c0_sleep {
+        group1 {
+            psels = <NRF_PSEL(TWIM_SDA, 0, 29)>,
+                    <NRF_PSEL(TWIM_SCL, 0, 31)>;
+            low-power-enable;
+        };
+    };
+};
+
 &pro_micro_i2c {
     status = "okay";
+    clock-frequency = <100000>;
+    pinctrl-0 = <&futaba_i2c0_default>;
+    pinctrl-1 = <&futaba_i2c0_sleep>;
+    pinctrl-names = "default", "sleep";
 
     // The current PCB only routes SDA/SCL/3V3/GND to the FPC trackpad connector,
     // so the IQS550 is configured without RDY/NRST and uses polling mode.
