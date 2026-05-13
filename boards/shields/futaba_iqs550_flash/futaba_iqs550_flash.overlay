@@ -1,0 +1,10 @@
+/*
+ * One-shot GR-Trackpad65 IQS550 firmware writer.
+ *
+ * Build together with the futaba shield:
+ * SHIELD="futaba futaba_iqs550_flash"
+ */
+
+&iqs550 {
+    program-firmware;
+};

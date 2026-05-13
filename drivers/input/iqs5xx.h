@@ -12,17 +12,23 @@
 #define IQS5XX_TOUCH_STRENGTH 0x001A // 2 bytes.
 #define IQS5XX_TOUCH_AREA 0x001C
 
+#define IQS5XX_BOOTLOADER_STATUS 0x0006
+
 #define IQS5XX_BOTTOM_BETA 0x0637
 #define IQS5XX_STATIONARY_THRESH 0x0672
 
 #define IQS5XX_END_COMM_WINDOW 0xEEEE
 
 #define IQS5XX_SYSTEM_CONTROL_0 0x0431
+#define IQS5XX_SYSTEM_CONTROL_1 0x0432
 // System Control 0 bits.
 #define IQS5XX_ACK_RESET BIT(7)
 #define IQS5XX_AUTO_ATI BIT(5)
 #define IQS5XX_ALP_RESEED BIT(4)
 #define IQS5XX_RESEED BIT(3)
+
+// System Control 1 bits.
+#define IQS5XX_RESET BIT(1)
 
 #define IQS5XX_SYSTEM_CONFIG_0 0x058E
 // System Config 0 bits.
@@ -115,6 +121,15 @@
 #define IQS5XX_FLIP_Y BIT(1)
 #define IQS5XX_SWITCH_XY_AXIS BIT(2)
 
+#define IQS5XX_BL_ADDR_XOR 0x40
+#define IQS5XX_BL_CMD_VERSION 0x00
+#define IQS5XX_BL_CMD_READ 0x01
+#define IQS5XX_BL_CMD_EXIT 0x02
+#define IQS5XX_BL_CMD_CRC_CHECK 0x03
+#define IQS5XX_BL_PROGRAM_BLOCK_SIZE 64
+#define IQS5XX_BL_VERSION_MAJOR 0x02
+#define IQS5XX_BL_VERSION_MINOR 0x00
+
 struct iqs5xx_config {
     struct i2c_dt_spec i2c;
     struct gpio_dt_spec rdy_gpio;
@@ -140,6 +155,9 @@ struct iqs5xx_config {
     uint8_t bottom_beta;
     uint8_t stationary_threshold;
     uint16_t poll_interval_ms;
+
+    bool program_firmware;
+    bool force_firmware_update;
 };
 
 struct iqs5xx_data {

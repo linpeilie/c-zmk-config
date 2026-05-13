@@ -6,6 +6,7 @@
 #define DT_DRV_COMPAT azoteq_iqs5xx
 
 #include <stdlib.h>
+#include <string.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -15,6 +16,7 @@
 #include <zephyr/logging/log.h>
 
 #include "iqs5xx.h"
+#include "iqs5xx_gr_trackpad65_fw.h"
 
 LOG_MODULE_REGISTER(iqs5xx, CONFIG_INPUT_LOG_LEVEL);
 
@@ -59,6 +61,195 @@ static int iqs5xx_end_comm_window(const struct device *dev) {
     uint8_t buf[3] = {IQS5XX_END_COMM_WINDOW >> 8, IQS5XX_END_COMM_WINDOW & 0xFF, 0x00};
 
     return i2c_write_dt(&config->i2c, buf, sizeof(buf));
+}
+
+static int iqs5xx_i2c_write16_addr(const struct iqs5xx_config *config, uint16_t addr,
+                                   uint16_t reg, const uint8_t *data, size_t len) {
+    uint8_t buf[2 + IQS5XX_BL_PROGRAM_BLOCK_SIZE];
+
+    if (len > IQS5XX_BL_PROGRAM_BLOCK_SIZE) {
+        return -EINVAL;
+    }
+
+    buf[0] = reg >> 8;
+    buf[1] = reg & 0xFF;
+    memcpy(&buf[2], data, len);
+
+    return i2c_write(config->i2c.bus, buf, len + 2, addr);
+}
+
+static int iqs5xx_bl_read_cmd(const struct iqs5xx_config *config, uint16_t addr, uint8_t cmd,
+                              uint8_t *data, size_t len) {
+    return i2c_write_read(config->i2c.bus, addr, &cmd, 1, data, len);
+}
+
+static int iqs5xx_bl_write_cmd(const struct iqs5xx_config *config, uint16_t addr, uint8_t cmd,
+                               uint8_t data) {
+    uint8_t buf[2] = {cmd, data};
+
+    return i2c_write(config->i2c.bus, buf, sizeof(buf), addr);
+}
+
+static int iqs5xx_bl_read_block(const struct iqs5xx_config *config, uint16_t addr, uint16_t reg,
+                                uint8_t *data, size_t len) {
+    uint8_t cmd[3] = {IQS5XX_BL_CMD_READ, reg >> 8, reg & 0xFF};
+
+    return i2c_write_read(config->i2c.bus, addr, cmd, sizeof(cmd), data, len);
+}
+
+static int iqs5xx_wait_for_bootloader(const struct device *dev, uint8_t *version, uint16_t timeout_ms) {
+    const struct iqs5xx_config *config = dev->config;
+    uint16_t bl_addr = config->i2c.addr ^ IQS5XX_BL_ADDR_XOR;
+    int ret = -ETIMEDOUT;
+
+    for (uint16_t elapsed = 0; elapsed < timeout_ms; elapsed += 10) {
+        ret = iqs5xx_bl_read_cmd(config, bl_addr, IQS5XX_BL_CMD_VERSION, version, 2);
+        if (ret == 0) {
+            return 0;
+        }
+        k_msleep(10);
+    }
+
+    return ret < 0 ? ret : -ETIMEDOUT;
+}
+
+static int iqs5xx_enter_bootloader(const struct device *dev, uint8_t *version) {
+    const struct iqs5xx_config *config = dev->config;
+    int ret;
+
+    if (config->reset_gpio.port) {
+        gpio_pin_set_dt(&config->reset_gpio, 1);
+        k_msleep(1);
+        gpio_pin_set_dt(&config->reset_gpio, 0);
+        ret = iqs5xx_wait_for_bootloader(dev, version, 1000);
+        if (ret == 0) {
+            return 0;
+        }
+    } else {
+        ret = iqs5xx_wait_for_bootloader(dev, version, 100);
+        if (ret == 0) {
+            return 0;
+        }
+
+        ret = iqs5xx_write_reg8(dev, IQS5XX_SYSTEM_CONTROL_1, IQS5XX_RESET);
+        if (ret == 0) {
+            (void)iqs5xx_end_comm_window(dev);
+        }
+
+        ret = iqs5xx_wait_for_bootloader(dev, version, 1000);
+        if (ret == 0) {
+            return 0;
+        }
+    }
+
+    return ret;
+}
+
+static int iqs5xx_gr_trackpad65_nv_matches(const struct iqs5xx_config *config, uint16_t bl_addr) {
+    uint8_t buf[IQS5XX_BL_PROGRAM_BLOCK_SIZE];
+
+    for (uint16_t offset = 0; offset < IQS5XX_GR_TRACKPAD65_NV_SIZE;
+         offset += IQS5XX_BL_PROGRAM_BLOCK_SIZE) {
+        int ret = iqs5xx_bl_read_block(config, bl_addr, IQS5XX_GR_TRACKPAD65_NV_START + offset, buf,
+                                       sizeof(buf));
+        if (ret < 0) {
+            return ret;
+        }
+
+        if (memcmp(buf, &iqs5xx_gr_trackpad65_fw[IQS5XX_GR_TRACKPAD65_NV_START -
+                                                IQS5XX_GR_TRACKPAD65_FW_START + offset],
+                   sizeof(buf)) != 0) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static int iqs5xx_program_gr_trackpad65_firmware(const struct device *dev) {
+    const struct iqs5xx_config *config = dev->config;
+    uint16_t bl_addr = config->i2c.addr ^ IQS5XX_BL_ADDR_XOR;
+    uint8_t version[2];
+    uint8_t status;
+    int ret;
+
+    LOG_INF("Entering IQS5xx bootloader for GR-Trackpad65 firmware programming");
+
+    ret = iqs5xx_enter_bootloader(dev, version);
+    if (ret < 0) {
+        LOG_ERR("Failed to enter IQS5xx bootloader: %d", ret);
+        return ret;
+    }
+
+    if (version[0] != IQS5XX_BL_VERSION_MAJOR || version[1] != IQS5XX_BL_VERSION_MINOR) {
+        LOG_ERR("Unsupported IQS5xx bootloader version %u.%u", version[0], version[1]);
+        return -ENOTSUP;
+    }
+
+    if (!config->force_firmware_update) {
+        ret = iqs5xx_gr_trackpad65_nv_matches(config, bl_addr);
+        if (ret < 0) {
+            LOG_WRN("Could not verify existing GR-Trackpad65 NV config: %d", ret);
+        } else if (ret == 1) {
+            LOG_INF("GR-Trackpad65 non-volatile config already matches bundled image");
+            (void)iqs5xx_bl_write_cmd(config, bl_addr, IQS5XX_BL_CMD_EXIT, 0);
+            k_msleep(100);
+            return 0;
+        }
+    }
+
+    LOG_INF("Programming GR-Trackpad65 IQS550 image (%u bytes)",
+            (unsigned int)IQS5XX_GR_TRACKPAD65_FW_SIZE);
+
+    for (uint16_t offset = 0; offset < IQS5XX_GR_TRACKPAD65_FW_SIZE;
+         offset += IQS5XX_BL_PROGRAM_BLOCK_SIZE) {
+        ret = iqs5xx_i2c_write16_addr(config, bl_addr, IQS5XX_GR_TRACKPAD65_FW_START + offset,
+                                      &iqs5xx_gr_trackpad65_fw[offset],
+                                      IQS5XX_BL_PROGRAM_BLOCK_SIZE);
+        if (ret < 0) {
+            LOG_ERR("Failed to write IQS5xx firmware block 0x%04x: %d",
+                    (unsigned int)(IQS5XX_GR_TRACKPAD65_FW_START + offset), ret);
+            return ret;
+        }
+
+        k_msleep(7);
+    }
+
+    ret = iqs5xx_i2c_write16_addr(config, bl_addr, IQS5XX_GR_TRACKPAD65_CRC_ADDR,
+                                  iqs5xx_gr_trackpad65_crc,
+                                  IQS5XX_GR_TRACKPAD65_CRC_SIZE);
+    if (ret < 0) {
+        LOG_ERR("Failed to write IQS5xx CRC descriptor: %d", ret);
+        return ret;
+    }
+    k_msleep(7);
+
+    ret = iqs5xx_bl_read_cmd(config, bl_addr, IQS5XX_BL_CMD_CRC_CHECK, &status, 1);
+    if (ret < 0) {
+        LOG_ERR("Failed to run IQS5xx CRC check: %d", ret);
+        return ret;
+    }
+    if (status != 0) {
+        LOG_ERR("IQS5xx CRC check failed with status 0x%02x", status);
+        return -EIO;
+    }
+
+    ret = iqs5xx_gr_trackpad65_nv_matches(config, bl_addr);
+    if (ret != 1) {
+        LOG_ERR("IQS5xx non-volatile readback verification failed: %d", ret);
+        return ret < 0 ? ret : -EIO;
+    }
+
+    LOG_INF("GR-Trackpad65 IQS550 firmware programmed successfully");
+
+    ret = iqs5xx_bl_write_cmd(config, bl_addr, IQS5XX_BL_CMD_EXIT, 0);
+    if (ret < 0) {
+        LOG_ERR("Failed to exit IQS5xx bootloader: %d", ret);
+        return ret;
+    }
+
+    k_msleep(100);
+    return 0;
 }
 
 static void iqs5xx_button_release_work_handler(struct k_work *work) {
@@ -372,6 +563,14 @@ static int iqs5xx_init(const struct device *dev) {
         k_msleep(10);
     }
 
+    if (config->program_firmware) {
+        ret = iqs5xx_program_gr_trackpad65_firmware(dev);
+        if (ret < 0) {
+            LOG_ERR("Failed to program GR-Trackpad65 firmware: %d", ret);
+            return ret;
+        }
+    }
+
     if (config->rdy_gpio.port) {
         if (!gpio_is_ready_dt(&config->rdy_gpio)) {
             LOG_ERR("RDY GPIO not ready");
@@ -445,6 +644,8 @@ static int iqs5xx_init(const struct device *dev) {
         .bottom_beta = DT_INST_PROP_OR(n, bottom_beta, 5),                                            \
         .stationary_threshold = DT_INST_PROP_OR(n, stationary_threshold, 5),                         \
         .poll_interval_ms = DT_INST_PROP_OR(n, poll_interval_ms, 12),                                \
+        .program_firmware = DT_INST_PROP(n, program_firmware),                                       \
+        .force_firmware_update = DT_INST_PROP(n, force_firmware_update),                             \
     };                                                                                                \
     DEVICE_DT_INST_DEFINE(n, iqs5xx_init, NULL, &iqs5xx_data_##n, &iqs5xx_config_##n, POST_KERNEL,  \
                           CONFIG_INPUT_INIT_PRIORITY, NULL);

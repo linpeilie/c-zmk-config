@@ -1,0 +1,9 @@
+if SHIELD_FUTABA_IQS550_FLASH
+
+config I2C
+    default y
+
+config ZMK_USB
+    default y
+
+endif
