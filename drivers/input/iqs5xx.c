@@ -392,15 +392,19 @@ static void iqs5xx_work_handler(struct k_work *work) {
         input_report_key(dev, LEFT_BUTTON_CODE, 0, true, K_FOREVER);
         data->active_hold = false;
     } else if (config->one_finger_tap && (gesture_events_0 & IQS5XX_SINGLE_TAP)) {
+        LOG_DBG("IQS5xx one-finger tap");
         iqs5xx_report_click(data, LEFT_BUTTON_CODE);
     } else if (config->two_finger_tap && (gesture_events_1 & IQS5XX_TWO_FINGER_TAP)) {
+        LOG_DBG("IQS5xx two-finger tap");
         iqs5xx_report_click(data, RIGHT_BUTTON_CODE);
     } else if (scroll) {
+        LOG_DBG("IQS5xx scroll fingers=%u rel=(%d,%d)", num_fingers, rel_x, rel_y);
         (void)iqs5xx_report_scroll(config, data, rel_x, rel_y);
     } else if (tp_movement && num_fingers == 1) {
         rel_x = iqs5xx_apply_divisor(rel_x, config->movement_divisor);
         rel_y = iqs5xx_apply_divisor(rel_y, config->movement_divisor);
         if (rel_x != 0 || rel_y != 0) {
+            LOG_DBG("IQS5xx move rel=(%d,%d)", rel_x, rel_y);
             input_report_rel(dev, INPUT_REL_X, rel_x, false, K_FOREVER);
             input_report_rel(dev, INPUT_REL_Y, rel_y, true, K_FOREVER);
         }
@@ -432,7 +436,19 @@ static void iqs5xx_rdy_handler(const struct device *port, struct gpio_callback *
 
 static int iqs5xx_setup_device(const struct device *dev) {
     const struct iqs5xx_config *config = dev->config;
+    uint8_t version[6];
     int ret;
+
+    ret = iqs5xx_read_block(dev, IQS5XX_PRODUCT_NUMBER, version, sizeof(version));
+    if (ret < 0) {
+        LOG_ERR("Failed to read IQS5xx product/version at app address 0x%02x: %d",
+                config->i2c.addr, ret);
+        return ret;
+    }
+
+    LOG_INF("IQS5xx product %u project %u version %u.%u",
+            (uint16_t)((version[0] << 8) | version[1]),
+            (uint16_t)((version[2] << 8) | version[3]), version[4], version[5]);
 
     // Enable event mode and trackpad events.
     ret = iqs5xx_write_reg8(dev, IQS5XX_SYSTEM_CONFIG_1,

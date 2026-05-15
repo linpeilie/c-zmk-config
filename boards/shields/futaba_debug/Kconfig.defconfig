@@ -4,6 +4,24 @@ config ZMK_KEYBOARD_NAME
     default "Futaba Debug"
 
 config I2C
-    default n
+    default y
+
+config ZMK_POINTING
+    default y
+
+config ZMK_USB
+    default y
+
+config LOG
+    default y
+
+config ZMK_LOG_LEVEL_DBG
+    default y
+
+config LOG_PROCESS_THREAD_STARTUP_DELAY_MS
+    default 3000
+
+config LOG_BUFFER_SIZE
+    default 16384
 
 endif

@@ -22,7 +22,7 @@ include:
   - board: nice_nano_v2
     shield: futaba
   - board: nice_nano_v2
-    shield: futaba_debug
+    shield: futaba futaba_debug
     snippet: zmk-usb-logging
     artifact-name: futaba_debug
   - board: nice_nano_v2

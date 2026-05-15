@@ -4,6 +4,7 @@
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/kernel.h>
 
+#define IQS5XX_PRODUCT_NUMBER 0x0000
 #define IQS5XX_NUM_FINGERS 0x0011
 #define IQS5XX_TOUCH_DATA_START 0x000D
 #define IQS5XX_TOUCH_DATA_SIZE 44
