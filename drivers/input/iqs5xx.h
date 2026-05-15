@@ -5,6 +5,8 @@
 #include <zephyr/kernel.h>
 
 #define IQS5XX_NUM_FINGERS 0x0011
+#define IQS5XX_TOUCH_DATA_START 0x000D
+#define IQS5XX_TOUCH_DATA_SIZE 44
 #define IQS5XX_REL_X 0x0012          // 2 bytes.
 #define IQS5XX_REL_Y 0x0014          // 2 bytes.
 #define IQS5XX_ABS_X 0x0016          // 2 bytes.
@@ -155,6 +157,8 @@ struct iqs5xx_config {
     uint8_t bottom_beta;
     uint8_t stationary_threshold;
     uint16_t poll_interval_ms;
+    uint16_t scroll_divisor;
+    uint16_t movement_divisor;
 
     bool program_firmware;
     bool force_firmware_update;

@@ -111,5 +111,7 @@
         bottom-beta = <5>;
         stationary-threshold = <5>;
         poll-interval-ms = <12>;
+        movement-divisor = <1>;
+        scroll-divisor = <24>;
     };
 };

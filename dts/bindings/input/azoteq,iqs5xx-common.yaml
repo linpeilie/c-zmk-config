@@ -69,6 +69,19 @@ properties:
       that only route I2C to the IQS5xx and cannot use interrupt-driven updates.
     default: 12
 
+  scroll-divisor:
+    type: int
+    description: |
+      Relative-motion units per wheel tick. Higher values make scrolling slower.
+    default: 24
+
+  movement-divisor:
+    type: int
+    description: |
+      Relative-motion divisor for pointer movement. Higher values make cursor
+      movement slower. A value of 1 reports raw IQS5xx relative movement.
+    default: 1
+
   program-firmware:
     type: boolean
     description: |
