@@ -186,4 +186,6 @@ struct iqs5xx_data {
     // Scroll accumulators.
     int16_t scroll_x_acc;
     int16_t scroll_y_acc;
+    int last_touch_read_error;
+    uint32_t last_touch_read_error_ms;
 };

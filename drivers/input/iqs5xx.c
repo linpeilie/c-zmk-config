@@ -354,9 +354,17 @@ static void iqs5xx_work_handler(struct k_work *work) {
 
     ret = iqs5xx_read_block(dev, IQS5XX_TOUCH_DATA_START, touch_data, sizeof(touch_data));
     if (ret < 0) {
-        LOG_ERR("Failed to read IQS5xx touch data: %d", ret);
+        uint32_t now = k_uptime_get_32();
+        if (ret != data->last_touch_read_error ||
+            now - data->last_touch_read_error_ms >= 1000) {
+            LOG_ERR("Failed to read IQS5xx touch data: %d", ret);
+            data->last_touch_read_error = ret;
+            data->last_touch_read_error_ms = now;
+        }
         goto end_comm;
     }
+
+    data->last_touch_read_error = 0;
 
     const uint8_t gesture_events_0 = touch_data[0];
     const uint8_t gesture_events_1 = touch_data[1];
@@ -509,11 +517,16 @@ app_ready:
             (uint16_t)((version[0] << 8) | version[1]),
             (uint16_t)((version[2] << 8) | version[3]), version[4], version[5]);
 
-    // Enable event mode and trackpad events.
-    ret = iqs5xx_write_reg8(dev, IQS5XX_SYSTEM_CONFIG_1,
-                            IQS5XX_EVENT_MODE | IQS5XX_TP_EVENT | IQS5XX_GESTURE_EVENT);
+    uint8_t event_config = 0;
+    if (config->rdy_gpio.port) {
+        event_config = IQS5XX_EVENT_MODE | IQS5XX_TP_EVENT | IQS5XX_GESTURE_EVENT;
+    } else {
+        LOG_INF("RDY GPIO not present; disabling IQS5xx event mode for polling");
+    }
+
+    ret = iqs5xx_write_reg8(dev, IQS5XX_SYSTEM_CONFIG_1, event_config);
     if (ret < 0) {
-        LOG_ERR("Failed to configure event mode: %d", ret);
+        LOG_ERR("Failed to configure event mode register: %d", ret);
         return ret;
     }
 
