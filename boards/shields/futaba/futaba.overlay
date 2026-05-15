@@ -110,6 +110,9 @@
 
         bottom-beta = <5>;
         stationary-threshold = <5>;
+        startup-delay-ms = <1000>;
+        startup-probe-timeout-ms = <3000>;
+        startup-probe-interval-ms = <250>;
         poll-interval-ms = <12>;
         movement-divisor = <1>;
         scroll-divisor = <24>;

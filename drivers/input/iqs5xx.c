@@ -434,18 +434,77 @@ static void iqs5xx_rdy_handler(const struct device *port, struct gpio_callback *
     k_work_submit(&data->work);
 }
 
+static int iqs5xx_wait_for_app_address(const struct device *dev, uint8_t *version, size_t len) {
+    const struct iqs5xx_config *config = dev->config;
+    uint16_t interval_ms = config->startup_probe_interval_ms;
+    uint16_t timeout_ms = config->startup_probe_timeout_ms;
+    int ret = -ETIMEDOUT;
+
+    if (interval_ms == 0) {
+        interval_ms = 250;
+    }
+
+    for (uint16_t elapsed = 0; elapsed <= timeout_ms; elapsed += interval_ms) {
+        ret = iqs5xx_read_block(dev, IQS5XX_PRODUCT_NUMBER, version, len);
+        if (ret == 0) {
+            return 0;
+        }
+
+        if (elapsed == 0 || ((elapsed % 1000) == 0)) {
+            LOG_WRN("IQS5xx app address 0x%02x probe failed at %u ms: %d", config->i2c.addr,
+                    elapsed, ret);
+        }
+
+        k_msleep(interval_ms);
+    }
+
+    return ret < 0 ? ret : -ETIMEDOUT;
+}
+
+static int iqs5xx_exit_bootloader_if_present(const struct device *dev) {
+    const struct iqs5xx_config *config = dev->config;
+    uint16_t bl_addr = config->i2c.addr ^ IQS5XX_BL_ADDR_XOR;
+    uint8_t bl_version[2];
+    int ret;
+
+    ret = iqs5xx_bl_read_cmd(config, bl_addr, IQS5XX_BL_CMD_VERSION, bl_version, sizeof(bl_version));
+    if (ret < 0) {
+        return ret;
+    }
+
+    LOG_WRN("IQS5xx responded at bootloader address 0x%02x version %u.%u; exiting bootloader",
+            bl_addr, bl_version[0], bl_version[1]);
+
+    ret = iqs5xx_bl_write_cmd(config, bl_addr, IQS5XX_BL_CMD_EXIT, 0);
+    if (ret < 0) {
+        LOG_ERR("Failed to exit IQS5xx bootloader at 0x%02x: %d", bl_addr, ret);
+        return ret;
+    }
+
+    k_msleep(250);
+    return 0;
+}
+
 static int iqs5xx_setup_device(const struct device *dev) {
     const struct iqs5xx_config *config = dev->config;
     uint8_t version[6];
     int ret;
 
-    ret = iqs5xx_read_block(dev, IQS5XX_PRODUCT_NUMBER, version, sizeof(version));
+    ret = iqs5xx_wait_for_app_address(dev, version, sizeof(version));
     if (ret < 0) {
-        LOG_ERR("Failed to read IQS5xx product/version at app address 0x%02x: %d",
-                config->i2c.addr, ret);
+        if (iqs5xx_exit_bootloader_if_present(dev) == 0) {
+            ret = iqs5xx_wait_for_app_address(dev, version, sizeof(version));
+            if (ret == 0) {
+                goto app_ready;
+            }
+        }
+
+        LOG_ERR("IQS5xx app address 0x%02x did not respond within %u ms: %d", config->i2c.addr,
+                config->startup_probe_timeout_ms, ret);
         return ret;
     }
 
+app_ready:
     LOG_INF("IQS5xx product %u project %u version %u.%u",
             (uint16_t)((version[0] << 8) | version[1]),
             (uint16_t)((version[2] << 8) | version[3]), version[4], version[5]);
@@ -614,8 +673,8 @@ static int iqs5xx_init(const struct device *dev) {
         LOG_INF("RDY GPIO not present, using polling mode (%u ms)", config->poll_interval_ms);
     }
 
-    // Wait for device to be ready.
-    k_msleep(100);
+    // Wait for the IQS5xx to leave reset/internal startup before probing app address.
+    k_msleep(config->startup_delay_ms);
 
     // Setup device configuration.
     ret = iqs5xx_setup_device(dev);
@@ -653,6 +712,9 @@ static int iqs5xx_init(const struct device *dev) {
         .flip_y = DT_INST_PROP(n, flip_y),                                                            \
         .bottom_beta = DT_INST_PROP_OR(n, bottom_beta, 5),                                            \
         .stationary_threshold = DT_INST_PROP_OR(n, stationary_threshold, 5),                         \
+        .startup_delay_ms = DT_INST_PROP_OR(n, startup_delay_ms, 500),                               \
+        .startup_probe_timeout_ms = DT_INST_PROP_OR(n, startup_probe_timeout_ms, 2000),              \
+        .startup_probe_interval_ms = DT_INST_PROP_OR(n, startup_probe_interval_ms, 250),             \
         .poll_interval_ms = DT_INST_PROP_OR(n, poll_interval_ms, 12),                                \
         .scroll_divisor = DT_INST_PROP_OR(n, scroll_divisor, 24),                                    \
         .movement_divisor = DT_INST_PROP_OR(n, movement_divisor, 1),                                 \

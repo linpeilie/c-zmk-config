@@ -157,6 +157,9 @@ struct iqs5xx_config {
     // Sensitivity configuration.
     uint8_t bottom_beta;
     uint8_t stationary_threshold;
+    uint16_t startup_delay_ms;
+    uint16_t startup_probe_timeout_ms;
+    uint16_t startup_probe_interval_ms;
     uint16_t poll_interval_ms;
     uint16_t scroll_divisor;
     uint16_t movement_divisor;

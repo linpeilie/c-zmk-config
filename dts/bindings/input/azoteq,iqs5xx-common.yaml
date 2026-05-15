@@ -62,6 +62,26 @@ properties:
       How far a finger must move (in pixels) to not be considered stationary.
     default: 5
 
+  startup-delay-ms:
+    type: int
+    description: |
+      Delay before probing the IQS5xx app address after host boot. Some boards
+      power the trackpad at the same time as the MCU, and the IQS5xx may not be
+      ready for app-address I2C transactions immediately.
+    default: 500
+
+  startup-probe-timeout-ms:
+    type: int
+    description: |
+      How long to retry probing the IQS5xx app address during driver startup.
+    default: 2000
+
+  startup-probe-interval-ms:
+    type: int
+    description: |
+      Delay between IQS5xx app-address probe attempts during driver startup.
+    default: 250
+
   poll-interval-ms:
     type: int
     description: |
