@@ -408,7 +408,7 @@ static void iqs5xx_work_handler(struct k_work *work) {
     } else if (scroll) {
         LOG_DBG("IQS5xx scroll fingers=%u rel=(%d,%d)", num_fingers, rel_x, rel_y);
         (void)iqs5xx_report_scroll(config, data, rel_x, rel_y);
-    } else if (tp_movement && num_fingers == 1) {
+    } else if (num_fingers == 1 && (tp_movement || rel_x != 0 || rel_y != 0)) {
         rel_x = iqs5xx_apply_divisor(rel_x, config->movement_divisor);
         rel_y = iqs5xx_apply_divisor(rel_y, config->movement_divisor);
         if (rel_x != 0 || rel_y != 0) {
