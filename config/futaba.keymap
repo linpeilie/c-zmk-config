@@ -33,7 +33,7 @@
                 &kp ESC   &kp Q     &kp W      &kp E      &kp R      &kp T         &kp MINUS &kp P      &kp O      &kp I       &kp U      &kp Y
                 &kp TAB   &kp A     &kp S      &kp D      &kp F      &kp G         &kp SQT   &kp SEMI   &kp L      &kp K       &kp J      &kp H
                 &kp LCTRL &kp Z     &kp X      &kp C      &kp V      &kp B         &kp BSLH  &kp FSLH   &kp DOT    &kp COMMA   &kp M      &kp N
-                         &kp LGUI  &kp LALT  L_LANG     L_NUM      &mo NAV      &kp DEL   &kp F5     &kp F2      &kp RBKT   &kp LBKT   R_LANG   R_NUM    &mo NAV
+                         &kp LGUI  &kp LALT    &kp L_LANG     &kp L_NUM      mo NAV      &kp DEL   &kp F5     &kp F2      &kp RBKT   &kp LBKT   &kp R_LANG   &kp R_NUM    &mo NAV
             >;
         };
 
