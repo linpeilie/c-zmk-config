@@ -158,7 +158,7 @@
         one-finger-tap;
         two-finger-tap;
         tap-drag;
-        tap-drag-timeout-ms = <300>;
+        tap-drag-timeout-ms = <200>;
 
         scroll;
         natural-scroll-x;

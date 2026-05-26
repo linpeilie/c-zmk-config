@@ -318,9 +318,40 @@ static void iqs5xx_report_click(struct iqs5xx_data *data, uint16_t button_code) 
     k_work_schedule(&data->button_release_work, K_MSEC(100));
 }
 
+static void iqs5xx_report_instant_click(struct iqs5xx_data *data, uint16_t button_code) {
+    input_report_key(data->dev, button_code, 1, true, K_FOREVER);
+    input_report_key(data->dev, button_code, 0, true, K_FOREVER);
+}
+
+static void iqs5xx_report_double_click(struct iqs5xx_data *data, uint16_t button_code) {
+    k_work_cancel_delayable(&data->button_release_work);
+    iqs5xx_release_buttons(data);
+    iqs5xx_report_instant_click(data, button_code);
+    iqs5xx_report_click(data, button_code);
+}
+
+static void iqs5xx_clear_pending_tap(struct iqs5xx_data *data) {
+    k_work_cancel_delayable(&data->tap_click_work);
+    data->pending_tap = false;
+    data->tap_drag_candidate = false;
+    data->last_tap_ms = 0;
+    data->tap_drag_x_acc = 0;
+    data->tap_drag_y_acc = 0;
+}
+
+static void iqs5xx_tap_click_work_handler(struct k_work *work) {
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct iqs5xx_data *data = CONTAINER_OF(dwork, struct iqs5xx_data, tap_click_work);
+
+    data->pending_tap = false;
+    data->tap_drag_candidate = false;
+    data->last_tap_ms = 0;
+    iqs5xx_report_click(data, LEFT_BUTTON_CODE);
+}
+
 static bool iqs5xx_tap_drag_timeout_active(const struct iqs5xx_config *config,
                                            const struct iqs5xx_data *data, uint32_t now) {
-    return config->tap_drag && data->last_tap_ms != 0 &&
+    return config->tap_drag && data->pending_tap && data->last_tap_ms != 0 &&
            now - data->last_tap_ms <= config->tap_drag_timeout_ms;
 }
 
@@ -400,7 +431,9 @@ static void iqs5xx_work_handler(struct k_work *work) {
     bool touch_started = touch_active && !data->touch_active;
     bool touch_ended = !touch_active && data->touch_active;
     bool tp_movement = (sys_info_1 & IQS5XX_TP_MOVEMENT) != 0;
-    bool scroll = config->scroll && !data->tap_drag_active && (gesture_events_1 & IQS5XX_SCROLL) != 0;
+    bool pointer_movement = num_fingers == 1 && (tp_movement || rel_x != 0 || rel_y != 0);
+    bool scroll = config->scroll && !data->tap_drag_active && !data->tap_drag_candidate &&
+                  (gesture_events_1 & IQS5XX_SCROLL) != 0;
     if (!scroll) {
         data->scroll_x_acc = 0;
         data->scroll_y_acc = 0;
@@ -410,12 +443,26 @@ static void iqs5xx_work_handler(struct k_work *work) {
     bool hold_released = !(gesture_events_0 & IQS5XX_PRESS_AND_HOLD) && data->active_hold;
 
     if (touch_started && num_fingers == 1 && iqs5xx_tap_drag_timeout_active(config, data, now)) {
+        LOG_DBG("IQS5xx tap drag candidate");
+        k_work_cancel_delayable(&data->tap_click_work);
+        data->tap_drag_candidate = true;
+        data->tap_drag_x_acc = 0;
+        data->tap_drag_y_acc = 0;
+    }
+
+    if (data->tap_drag_candidate && pointer_movement) {
+        data->tap_drag_x_acc += rel_x;
+        data->tap_drag_y_acc += rel_y;
+    }
+
+    if (data->tap_drag_candidate &&
+        abs(data->tap_drag_x_acc) + abs(data->tap_drag_y_acc) >= config->stationary_threshold) {
         LOG_DBG("IQS5xx tap drag started");
+        iqs5xx_clear_pending_tap(data);
         k_work_cancel_delayable(&data->button_release_work);
         iqs5xx_release_buttons(data);
         input_report_key(dev, LEFT_BUTTON_CODE, 1, true, K_FOREVER);
         data->tap_drag_active = true;
-        data->last_tap_ms = 0;
     }
 
     if (data->tap_drag_active && (touch_ended || num_fingers != 1)) {
@@ -434,6 +481,10 @@ static void iqs5xx_work_handler(struct k_work *work) {
     if (data->suppress_next_single_tap && (gesture_events_0 & IQS5XX_SINGLE_TAP)) {
         LOG_DBG("IQS5xx suppressed tap after drag");
         data->suppress_next_single_tap = false;
+    } else if (touch_ended && data->tap_drag_candidate &&
+               !(gesture_events_0 & IQS5XX_SINGLE_TAP)) {
+        data->tap_drag_candidate = false;
+        k_work_schedule(&data->tap_click_work, K_MSEC(IQS5XX_TAP_DRAG_SUPPRESS_MS));
     } else if (!data->tap_drag_active && hold_became_active) {
         LOG_INF("Hold became active");
         input_report_key(dev, LEFT_BUTTON_CODE, 1, true, K_FOREVER);
@@ -445,19 +496,30 @@ static void iqs5xx_work_handler(struct k_work *work) {
     } else if (!data->tap_drag_active && config->one_finger_tap &&
                (gesture_events_0 & IQS5XX_SINGLE_TAP)) {
         LOG_DBG("IQS5xx one-finger tap");
-        iqs5xx_report_click(data, LEFT_BUTTON_CODE);
-        data->last_tap_ms = now;
+        if (config->tap_drag) {
+            if (data->pending_tap) {
+                iqs5xx_clear_pending_tap(data);
+                iqs5xx_report_double_click(data, LEFT_BUTTON_CODE);
+            } else {
+                data->pending_tap = true;
+                data->tap_drag_candidate = false;
+                data->last_tap_ms = now;
+                k_work_schedule(&data->tap_click_work, K_MSEC(config->tap_drag_timeout_ms));
+            }
+        } else {
+            iqs5xx_report_click(data, LEFT_BUTTON_CODE);
+        }
     } else if (!data->tap_drag_active && config->two_finger_tap &&
                (gesture_events_1 & IQS5XX_TWO_FINGER_TAP)) {
         LOG_DBG("IQS5xx two-finger tap");
+        iqs5xx_clear_pending_tap(data);
         iqs5xx_report_click(data, RIGHT_BUTTON_CODE);
-        data->last_tap_ms = 0;
     }
 
     if (scroll) {
         LOG_DBG("IQS5xx scroll fingers=%u rel=(%d,%d)", num_fingers, rel_x, rel_y);
         (void)iqs5xx_report_scroll(config, data, rel_x, rel_y);
-    } else if (num_fingers == 1 && (tp_movement || rel_x != 0 || rel_y != 0)) {
+    } else if (pointer_movement) {
         rel_x = iqs5xx_apply_divisor(rel_x, config->movement_divisor);
         rel_y = iqs5xx_apply_divisor(rel_y, config->movement_divisor);
         if (rel_x != 0 || rel_y != 0) {
@@ -675,6 +737,7 @@ static int iqs5xx_init(const struct device *dev) {
     k_work_init(&data->work, iqs5xx_work_handler);
     k_work_init_delayable(&data->poll_work, iqs5xx_poll_work_handler);
     k_work_init_delayable(&data->button_release_work, iqs5xx_button_release_work_handler);
+    k_work_init_delayable(&data->tap_click_work, iqs5xx_tap_click_work_handler);
     k_work_init_delayable(&data->firmware_program_work, iqs5xx_firmware_program_work_handler);
 
     // Configure reset GPIO if available.

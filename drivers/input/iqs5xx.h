@@ -179,6 +179,7 @@ struct iqs5xx_data {
     struct k_work work;
     struct k_work_delayable poll_work;
     struct k_work_delayable button_release_work;
+    struct k_work_delayable tap_click_work;
     struct k_work_delayable firmware_program_work;
     // TODO: Pack flags into a bitfield to save space.
     bool initialized;
@@ -186,10 +187,14 @@ struct iqs5xx_data {
     uint8_t buttons_pressed;
     bool active_hold;
     bool touch_active;
+    bool pending_tap;
+    bool tap_drag_candidate;
     bool tap_drag_active;
     bool suppress_next_single_tap;
     uint32_t last_tap_ms;
     uint32_t suppress_single_tap_ms;
+    int16_t tap_drag_x_acc;
+    int16_t tap_drag_y_acc;
     // Scroll accumulators.
     int16_t scroll_x_acc;
     int16_t scroll_y_acc;
