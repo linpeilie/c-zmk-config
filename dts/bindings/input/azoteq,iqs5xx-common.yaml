@@ -24,6 +24,15 @@ properties:
     type: boolean
     description: "Register two finger tap gestures and report them as a right click"
 
+  tap-drag:
+    type: boolean
+    description: "After a one finger tap, start a left-button drag if another finger touch begins within tap-drag-timeout-ms"
+
+  tap-drag-timeout-ms:
+    type: int
+    description: "Maximum delay after a one finger tap where a second touch starts a left-button drag"
+    default: 300
+
   scroll:
     type: boolean
     description: "Register and report scroll gestures, both vertical and horizontal scroll is supported"

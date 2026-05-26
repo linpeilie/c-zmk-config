@@ -156,9 +156,9 @@
         status = "okay";
 
         one-finger-tap;
-        press-and-hold;
-        press-and-hold-time = <250>;
         two-finger-tap;
+        tap-drag;
+        tap-drag-timeout-ms = <300>;
 
         scroll;
         natural-scroll-x;

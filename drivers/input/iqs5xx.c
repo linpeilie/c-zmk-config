@@ -20,6 +20,10 @@
 
 LOG_MODULE_REGISTER(iqs5xx, CONFIG_INPUT_LOG_LEVEL);
 
+#define IQS5XX_TAP_DRAG_SUPPRESS_MS 100
+
+static void iqs5xx_release_buttons(struct iqs5xx_data *data);
+
 static int iqs5xx_write_reg16(const struct device *dev, uint16_t reg, uint16_t val) {
     const struct iqs5xx_config *config = dev->config;
     uint8_t buf[4] = {reg >> 8, reg & 0xFF, val >> 8, val & 0xFF};
@@ -281,6 +285,10 @@ static void iqs5xx_button_release_work_handler(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     struct iqs5xx_data *data = CONTAINER_OF(dwork, struct iqs5xx_data, button_release_work);
 
+    iqs5xx_release_buttons(data);
+}
+
+static void iqs5xx_release_buttons(struct iqs5xx_data *data) {
     for (int i = 0; i < 3; i++) {
         if (data->buttons_pressed & BIT(i)) {
             input_report_key(data->dev, INPUT_BTN_0 + i, 0, true, K_FOREVER);
@@ -308,6 +316,12 @@ static void iqs5xx_report_click(struct iqs5xx_data *data, uint16_t button_code) 
     data->buttons_pressed |= BIT(button_code - INPUT_BTN_0);
 
     k_work_schedule(&data->button_release_work, K_MSEC(100));
+}
+
+static bool iqs5xx_tap_drag_timeout_active(const struct iqs5xx_config *config,
+                                           const struct iqs5xx_data *data, uint32_t now) {
+    return config->tap_drag && data->last_tap_ms != 0 &&
+           now - data->last_tap_ms <= config->tap_drag_timeout_ms;
 }
 
 static bool iqs5xx_report_scroll(const struct iqs5xx_config *config, struct iqs5xx_data *data,
@@ -381,8 +395,12 @@ static void iqs5xx_work_handler(struct k_work *work) {
         goto end_comm;
     }
 
+    uint32_t now = k_uptime_get_32();
+    bool touch_active = num_fingers > 0;
+    bool touch_started = touch_active && !data->touch_active;
+    bool touch_ended = !touch_active && data->touch_active;
     bool tp_movement = (sys_info_1 & IQS5XX_TP_MOVEMENT) != 0;
-    bool scroll = config->scroll && (gesture_events_1 & IQS5XX_SCROLL) != 0;
+    bool scroll = config->scroll && !data->tap_drag_active && (gesture_events_1 & IQS5XX_SCROLL) != 0;
     if (!scroll) {
         data->scroll_x_acc = 0;
         data->scroll_y_acc = 0;
@@ -391,21 +409,52 @@ static void iqs5xx_work_handler(struct k_work *work) {
     bool hold_became_active = (gesture_events_0 & IQS5XX_PRESS_AND_HOLD) && !data->active_hold;
     bool hold_released = !(gesture_events_0 & IQS5XX_PRESS_AND_HOLD) && data->active_hold;
 
-    if (hold_became_active) {
+    if (touch_started && num_fingers == 1 && iqs5xx_tap_drag_timeout_active(config, data, now)) {
+        LOG_DBG("IQS5xx tap drag started");
+        k_work_cancel_delayable(&data->button_release_work);
+        iqs5xx_release_buttons(data);
+        input_report_key(dev, LEFT_BUTTON_CODE, 1, true, K_FOREVER);
+        data->tap_drag_active = true;
+        data->last_tap_ms = 0;
+    }
+
+    if (data->tap_drag_active && (touch_ended || num_fingers != 1)) {
+        LOG_DBG("IQS5xx tap drag ended");
+        input_report_key(dev, LEFT_BUTTON_CODE, 0, true, K_FOREVER);
+        data->tap_drag_active = false;
+        data->suppress_next_single_tap = true;
+        data->suppress_single_tap_ms = now;
+    }
+
+    if (data->suppress_next_single_tap &&
+        now - data->suppress_single_tap_ms > IQS5XX_TAP_DRAG_SUPPRESS_MS) {
+        data->suppress_next_single_tap = false;
+    }
+
+    if (data->suppress_next_single_tap && (gesture_events_0 & IQS5XX_SINGLE_TAP)) {
+        LOG_DBG("IQS5xx suppressed tap after drag");
+        data->suppress_next_single_tap = false;
+    } else if (!data->tap_drag_active && hold_became_active) {
         LOG_INF("Hold became active");
         input_report_key(dev, LEFT_BUTTON_CODE, 1, true, K_FOREVER);
         data->active_hold = true;
-    } else if (hold_released) {
+    } else if (!data->tap_drag_active && hold_released) {
         LOG_INF("Hold became inactive");
         input_report_key(dev, LEFT_BUTTON_CODE, 0, true, K_FOREVER);
         data->active_hold = false;
-    } else if (config->one_finger_tap && (gesture_events_0 & IQS5XX_SINGLE_TAP)) {
+    } else if (!data->tap_drag_active && config->one_finger_tap &&
+               (gesture_events_0 & IQS5XX_SINGLE_TAP)) {
         LOG_DBG("IQS5xx one-finger tap");
         iqs5xx_report_click(data, LEFT_BUTTON_CODE);
-    } else if (config->two_finger_tap && (gesture_events_1 & IQS5XX_TWO_FINGER_TAP)) {
+        data->last_tap_ms = now;
+    } else if (!data->tap_drag_active && config->two_finger_tap &&
+               (gesture_events_1 & IQS5XX_TWO_FINGER_TAP)) {
         LOG_DBG("IQS5xx two-finger tap");
         iqs5xx_report_click(data, RIGHT_BUTTON_CODE);
-    } else if (scroll) {
+        data->last_tap_ms = 0;
+    }
+
+    if (scroll) {
         LOG_DBG("IQS5xx scroll fingers=%u rel=(%d,%d)", num_fingers, rel_x, rel_y);
         (void)iqs5xx_report_scroll(config, data, rel_x, rel_y);
     } else if (num_fingers == 1 && (tp_movement || rel_x != 0 || rel_y != 0)) {
@@ -417,6 +466,8 @@ static void iqs5xx_work_handler(struct k_work *work) {
             input_report_rel(dev, INPUT_REL_Y, rel_y, true, K_FOREVER);
         }
     }
+
+    data->touch_active = touch_active;
 
 end_comm:
     // End communication window.
@@ -716,10 +767,12 @@ static int iqs5xx_init(const struct device *dev) {
         .one_finger_tap = DT_INST_PROP(n, one_finger_tap),                                            \
         .press_and_hold = DT_INST_PROP(n, press_and_hold),                                            \
         .two_finger_tap = DT_INST_PROP(n, two_finger_tap),                                            \
+        .tap_drag = DT_INST_PROP(n, tap_drag),                                                        \
         .scroll = DT_INST_PROP(n, scroll),                                                            \
         .natural_scroll_x = DT_INST_PROP(n, natural_scroll_x),                                        \
         .natural_scroll_y = DT_INST_PROP(n, natural_scroll_y),                                        \
         .press_and_hold_time = DT_INST_PROP_OR(n, press_and_hold_time, 250),                         \
+        .tap_drag_timeout_ms = DT_INST_PROP_OR(n, tap_drag_timeout_ms, 300),                         \
         .switch_xy = DT_INST_PROP(n, switch_xy),                                                      \
         .flip_x = DT_INST_PROP(n, flip_x),                                                            \
         .flip_y = DT_INST_PROP(n, flip_y),                                                            \

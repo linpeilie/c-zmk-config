@@ -142,7 +142,9 @@ struct iqs5xx_config {
     bool one_finger_tap;
     bool press_and_hold;
     bool two_finger_tap;
+    bool tap_drag;
     uint16_t press_and_hold_time;
+    uint16_t tap_drag_timeout_ms;
 
     // Scrolling configuration.
     bool scroll;
@@ -183,6 +185,11 @@ struct iqs5xx_data {
     // Flag to indicate if the button was pressed in a previous cycle.
     uint8_t buttons_pressed;
     bool active_hold;
+    bool touch_active;
+    bool tap_drag_active;
+    bool suppress_next_single_tap;
+    uint32_t last_tap_ms;
+    uint32_t suppress_single_tap_ms;
     // Scroll accumulators.
     int16_t scroll_x_acc;
     int16_t scroll_y_acc;
