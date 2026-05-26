@@ -10,19 +10,14 @@
 
 #define NAV 1
 #define NUM 2
-
 #define L_NUM &lt NUM SPACE
 #define R_NUM &lt NUM ENTER
 #define L_LANG &mt LSHFT LANG2
 #define R_LANG &mt RSHFT LANG1
 
-&lt {
-    quick-tap-ms = <200>;
-};
+&lt { quick-tap-ms = <200>; };
 
-&mt {
-    quick-tap-ms = <200>;
-};
+&mt { quick-tap-ms = <200>; };
 
 / {
     keymap {
@@ -30,28 +25,28 @@
 
         default_layer {
             bindings = <
-                &kp TAB         &kp Q     &kp W     &kp E      &kp R      &kp T             &kp Y     &kp U          &kp I      &kp O      &kp P          &kp BACKSPACE
-                &kp LEFT_SHIFT  &kp A     &kp S     &kp D      &kp F      &kp G             &kp H     &kp J          &kp K      &kp L      &kp SEMI       &kp SQT
-                &kp LCTRL       &kp Z     &kp X     &kp C      &kp V      &kp B             &kp N     &kp M          &kp COMMA  &kp DOT    &kp FSLH       &kp EQUAL
-                                &kp LGUI  &kp LALT  &kp GRAVE  &kp SPACE  &mo NAV  &kp ESC  &kp CAPS  &kp BACKSLASH  &mo 2      &kp ENTER  &kp RIGHT_ALT  &kp LBKT    &kp RBKT
+&kp TAB         &kp Q     &kp W     &kp E      &kp R      &kp T             &kp Y     &kp U          &kp I      &kp O         &kp P          &kp BACKSPACE
+&kp LEFT_SHIFT  &kp A     &kp S     &kp D      &kp F      &kp G             &kp H     &kp J          &kp K      &kp L         &kp SEMI       &kp SQT
+&kp LCTRL       &kp Z     &kp X     &kp C      &kp V      &kp B             &kp N     &kp M          &kp COMMA  &kp DOT       &kp FSLH       &kp EQUAL
+                &kp LGUI  &kp LALT  &kp GRAVE  &kp SPACE  &mo NAV  &kp ESC  &kp CAPS  &kp BACKSLASH  &mo 2      &kp KP_ENTER  &kp RIGHT_ALT  &kp LBKT       &kp RBKT
             >;
         };
 
         nav_layer {
             bindings = <
-                &trans    &trans    &trans     &trans     &trans     &trans        &trans    &trans     &kp END    &kp PG_UP   &kp PG_DN  &kp HOME
-                &trans    &trans    &trans     &trans     &trans     &trans        &trans    &trans     &kp RIGHT  &kp UP      &kp DOWN   &kp LEFT
-                &trans    &trans    &trans     &trans     &trans     &trans        &trans    &trans     &kp RBKT   &kp LBKT    &kp RBRC   &kp LBRC
-                         &trans    &trans    &trans     &trans     &trans        &bt BT_CLR &sys_reset &bootloader &trans     &trans     &trans    &kp BSPC  &trans
+&trans  &studio_unlock  &trans  &trans  &trans  &trans              &trans      &trans       &kp END    &kp PG_UP  &kp PG_DN  &kp HOME
+&trans  &trans          &trans  &trans  &trans  &trans              &trans      &trans       &kp RIGHT  &kp UP     &kp DOWN   &kp LEFT
+&trans  &trans          &trans  &trans  &trans  &trans              &trans      &trans       &kp RBKT   &kp LBKT   &kp RBRC   &kp LBRC
+        &trans          &trans  &trans  &trans  &trans  &bt BT_CLR  &sys_reset  &bootloader  &trans     &trans     &trans     &kp BSPC  &trans
             >;
         };
 
         num_layer {
             bindings = <
-                &kp TILDE &kp EXCL  &kp AT     &kp HASH   &kp DLLR   &kp PRCNT      &kp PLUS  &kp RPAR   &kp LPAR   &kp STAR    &kp AMPS   &kp CARET
-                &kp GRAVE &kp N1    &kp N2     &kp N3     &kp N4     &kp N5         &kp EQUAL &kp N0     &kp N9     &kp N8      &kp N7     &kp N6
-                &kp F11   &kp F1    &kp F2     &kp F3     &kp F4     &kp F5         &kp F12   &kp F10    &kp F9     &kp F8      &kp F7     &kp F6
-                         &trans    &trans    &trans     &trans     &trans        &kp C_PREV &kp C_PP   &kp C_NEXT  &trans     &trans     &trans    &trans    &trans
+&kp TILDE  &kp EXCL  &kp AT  &kp HASH  &kp DLLR  &kp PRCNT              &kp CARET     &kp AMPS    &kp STAR  &kp LPAR  &kp RPAR  &kp PLUS
+&kp GRAVE  &kp N1    &kp N2  &kp N3    &kp N4    &kp N5                 &kp NUMBER_6  &kp N7      &kp N8    &kp N9    &kp N0    &kp EQUAL
+&kp F11    &kp F1    &kp F2  &kp F3    &kp F4    &kp F5                 &kp F6        &kp F7      &kp F8    &kp F9    &kp F11   &kp F12
+           &trans    &trans  &trans    &trans    &trans     &kp C_PREV  &kp C_PP      &kp C_NEXT  &trans    &trans    &trans    &trans     &trans
             >;
         };
     };
