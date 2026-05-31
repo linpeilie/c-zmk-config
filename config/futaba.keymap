@@ -34,10 +34,10 @@
 
         nav_layer {
             bindings = <
-&trans  &studio_unlock  &trans  &trans  &trans  &trans              &trans      &kp HOME     &kp UP     &kp END    &kp PG_UP  &kp BACKSPACE
-&trans  &trans          &trans  &trans  &trans  &trans              &trans      &kp LEFT     &kp DOWN   &kp RIGHT  &kp PG_DN  &kp SQT
-&trans  &trans          &trans  &trans  &trans  &trans              &trans      &trans       &kp COMMA  &kp DOT    &kp SLASH  &kp EQUAL
-        &trans          &trans  &trans  &trans  &trans  &bt BT_CLR  &sys_reset  &bootloader  &trans     &trans     &trans     &kp BSPC       &trans
+&trans  &studio_unlock  &kp NUMBER_1  &kp NUMBER_2  &kp NUMBER_3  &none                     &trans      &kp HOME     &kp UP     &kp END    &kp PG_UP  &kp BACKSPACE
+&trans  &none           &kp NUMBER_4  &kp NUMBER_5  &kp NUMBER_6  &kp NUMBER_0              &trans      &kp LEFT     &kp DOWN   &kp RIGHT  &kp PG_DN  &kp SQT
+&trans  &none           &kp NUMBER_7  &kp NUMBER_8  &kp NUMBER_9  &none                     &trans      &trans       &kp COMMA  &kp DOT    &kp SLASH  &kp EQUAL
+        &trans          &trans        &trans        &trans        &trans        &bt BT_CLR  &sys_reset  &bootloader  &trans     &trans     &trans     &kp BSPC       &trans
             >;
         };
 
