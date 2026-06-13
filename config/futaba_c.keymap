@@ -8,11 +8,6 @@
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/keys.h>
 
-#define NAV 1
-#define SYM 2
-#define NUM 3
-#define ADJ 4
-
 &lt { quick-tap-ms = <175>; };
 
 &mt { quick-tap-ms = <175>; };
@@ -38,7 +33,7 @@
 &kp TAB    &kp Q        &kp W        &kp E         &kp R          &kp T                  &kp Y      &kp U          &kp I          &kp O        &kp P          &kp BSPC
 &kp LSHFT  &hm LGUI A   &hm LALT S   &hm LCTRL D   &hm LSHFT F    &kp G                  &kp H      &hm RSHFT J    &hm RCTRL K    &hm RALT L   &hm RGUI SEMI  &kp SQT
 &kp LCTRL  &kp Z        &kp X        &kp C         &kp V          &kp B                  &kp N      &kp M          &kp COMMA      &kp DOT      &kp FSLH       &kp EQUAL
-            &kp LGUI    &kp LALT     &kp ESC       &lt SYM SPACE  &mo NAV     &kp GRAVE   &kp MINUS  &kp BACKSLASH  &mo NUM        &lt NAV ENTER &kp RALT     &kp LBKT       &kp RBKT
+            &kp LGUI    &kp LALT     &kp ESC       &lt 2 SPACE    &mo 1       &kp GRAVE   &kp MINUS  &kp BACKSLASH  &mo 3         &lt 1 ENTER  &kp RALT     &kp LBKT       &kp RBKT
             >;
         };
 
@@ -65,7 +60,7 @@
 &kp F1     &kp F2       &kp F3       &kp F4        &kp F5         &kp F6                 &kp F7     &kp F8         &kp F9         &kp F10       &kp F11      &kp F12
 &kp N1     &kp N2       &kp N3       &kp N4        &kp N5         &none                  &kp N6     &kp N7         &kp N8         &kp N9        &kp N0       &kp EQUAL
 &kp EXCL   &kp AT       &kp HASH     &kp DLLR      &kp PRCNT      &none                  &kp CARET  &kp AMPS       &kp STAR       &kp LPAR      &kp RPAR     &kp PLUS
-            &trans      &trans       &trans        &trans         &trans       &kp C_PREV &kp C_PP   &kp C_NEXT     &trans         &trans        &trans       &mo ADJ       &trans
+            &trans      &trans       &trans        &trans         &trans       &kp C_PREV &kp C_PP   &kp C_NEXT     &trans         &trans        &trans       &mo 4        &trans
             >;
         };
 
