@@ -1,0 +1,12 @@
+if SHIELD_FUTABA_C
+
+config ZMK_KEYBOARD_NAME
+    default "futaba-c"
+
+config ZMK_POINTING
+    default y
+
+config I2C
+    default y
+
+endif
