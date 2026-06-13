@@ -14,6 +14,9 @@
 #include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/activity_state_changed.h>
+#include <zmk/events/position_state_changed.h>
 
 #include "iqs5xx.h"
 #include "iqs5xx_gr_trackpad65_fw.h"
@@ -23,6 +26,8 @@ LOG_MODULE_REGISTER(iqs5xx, CONFIG_INPUT_LOG_LEVEL);
 #define IQS5XX_TAP_DRAG_SUPPRESS_MS 100
 
 static void iqs5xx_release_buttons(struct iqs5xx_data *data);
+
+static struct iqs5xx_data *iqs5xx_polling_data;
 
 static int iqs5xx_write_reg16(const struct device *dev, uint16_t reg, uint16_t val) {
     const struct iqs5xx_config *config = dev->config;
@@ -390,6 +395,39 @@ static bool iqs5xx_report_scroll(const struct iqs5xx_config *config, struct iqs5
     return false;
 }
 
+static bool iqs5xx_uses_polling(const struct iqs5xx_config *config) {
+    return !config->rdy_gpio.port && config->poll_interval_ms != 0 && !config->program_firmware;
+}
+
+static bool iqs5xx_has_active_state(const struct iqs5xx_data *data) {
+    return data->touch_active || data->pending_tap || data->tap_drag_candidate ||
+           data->tap_drag_active || data->active_hold || data->buttons_pressed != 0;
+}
+
+static void iqs5xx_mark_activity(struct iqs5xx_data *data, uint32_t now) {
+    const struct iqs5xx_config *config = data->dev->config;
+
+    data->last_activity_ms = now;
+
+    if (!data->initialized || !iqs5xx_uses_polling(config) || !data->poll_paused) {
+        return;
+    }
+
+    data->poll_paused = false;
+    LOG_INF("IQS5xx polling resumed");
+    k_work_reschedule(&data->poll_work, K_NO_WAIT);
+}
+
+static bool iqs5xx_should_pause_polling(struct iqs5xx_data *data, uint32_t now) {
+    const struct iqs5xx_config *config = data->dev->config;
+
+    if (config->idle_suspend_timeout_ms == 0 || iqs5xx_has_active_state(data)) {
+        return false;
+    }
+
+    return now - data->last_activity_ms >= config->idle_suspend_timeout_ms;
+}
+
 static void iqs5xx_work_handler(struct k_work *work) {
     struct iqs5xx_data *data = CONTAINER_OF(work, struct iqs5xx_data, work);
     const struct device *dev = data->dev;
@@ -441,6 +479,13 @@ static void iqs5xx_work_handler(struct k_work *work) {
 
     bool hold_became_active = (gesture_events_0 & IQS5XX_PRESS_AND_HOLD) && !data->active_hold;
     bool hold_released = !(gesture_events_0 & IQS5XX_PRESS_AND_HOLD) && data->active_hold;
+    bool trackpad_activity = touch_active || touch_ended || pointer_movement || scroll ||
+                             gesture_events_0 != 0 || gesture_events_1 != 0 ||
+                             hold_became_active || hold_released;
+
+    if (trackpad_activity) {
+        iqs5xx_mark_activity(data, now);
+    }
 
     if (touch_started && num_fingers == 1 && iqs5xx_tap_drag_timeout_active(config, data, now)) {
         LOG_DBG("IQS5xx tap drag candidate");
@@ -540,6 +585,13 @@ static void iqs5xx_poll_work_handler(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     struct iqs5xx_data *data = CONTAINER_OF(dwork, struct iqs5xx_data, poll_work);
     const struct iqs5xx_config *config = data->dev->config;
+    uint32_t now = k_uptime_get_32();
+
+    if (iqs5xx_should_pause_polling(data, now)) {
+        data->poll_paused = true;
+        LOG_INF("IQS5xx polling paused after %u ms idle", config->idle_suspend_timeout_ms);
+        return;
+    }
 
     k_work_submit(&data->work);
     k_work_reschedule(&data->poll_work, K_MSEC(config->poll_interval_ms));
@@ -554,6 +606,35 @@ static void iqs5xx_rdy_handler(const struct device *port, struct gpio_callback *
 
     k_work_submit(&data->work);
 }
+
+static int iqs5xx_activity_listener(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *ev = as_zmk_position_state_changed(eh);
+    const struct zmk_activity_state_changed *activity_ev = as_zmk_activity_state_changed(eh);
+    struct iqs5xx_data *data = iqs5xx_polling_data;
+
+    if (data == NULL) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    if (activity_ev != NULL) {
+        if (activity_ev->state == ZMK_ACTIVITY_ACTIVE) {
+            iqs5xx_mark_activity(data, k_uptime_get_32());
+        }
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    if (ev == NULL) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    iqs5xx_mark_activity(data, k_uptime_get_32());
+
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(iqs5xx_activity, iqs5xx_activity_listener);
+ZMK_SUBSCRIPTION(iqs5xx_activity, zmk_activity_state_changed);
+ZMK_SUBSCRIPTION(iqs5xx_activity, zmk_position_state_changed);
 
 static int iqs5xx_wait_for_app_address(const struct device *dev, uint8_t *version, size_t len) {
     const struct iqs5xx_config *config = dev->config;
@@ -734,6 +815,8 @@ static int iqs5xx_init(const struct device *dev) {
     }
 
     data->dev = dev;
+    data->last_activity_ms = k_uptime_get_32();
+    data->poll_paused = false;
     k_work_init(&data->work, iqs5xx_work_handler);
     k_work_init_delayable(&data->poll_work, iqs5xx_poll_work_handler);
     k_work_init_delayable(&data->button_release_work, iqs5xx_button_release_work_handler);
@@ -813,6 +896,7 @@ static int iqs5xx_init(const struct device *dev) {
     data->initialized = true;
 
     if (!config->rdy_gpio.port) {
+        iqs5xx_polling_data = data;
         k_work_schedule(&data->poll_work, K_MSEC(config->poll_interval_ms));
     }
 
@@ -845,6 +929,7 @@ static int iqs5xx_init(const struct device *dev) {
         .startup_probe_timeout_ms = DT_INST_PROP_OR(n, startup_probe_timeout_ms, 2000),              \
         .startup_probe_interval_ms = DT_INST_PROP_OR(n, startup_probe_interval_ms, 250),             \
         .poll_interval_ms = DT_INST_PROP_OR(n, poll_interval_ms, 12),                                \
+        .idle_suspend_timeout_ms = DT_INST_PROP_OR(n, idle_suspend_timeout_ms, 300000),              \
         .scroll_divisor = DT_INST_PROP_OR(n, scroll_divisor, 24),                                    \
         .movement_divisor = DT_INST_PROP_OR(n, movement_divisor, 1),                                 \
         .program_firmware = DT_INST_PROP(n, program_firmware),                                       \

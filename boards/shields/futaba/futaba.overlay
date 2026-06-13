@@ -171,6 +171,7 @@
         startup-probe-timeout-ms = <3000>;
         startup-probe-interval-ms = <250>;
         poll-interval-ms = <20>;
+        idle-suspend-timeout-ms = <300000>;
         movement-divisor = <2>;
         scroll-divisor = <24>;
     };

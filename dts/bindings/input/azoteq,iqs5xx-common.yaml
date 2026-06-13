@@ -98,6 +98,13 @@ properties:
       that only route I2C to the IQS5xx and cannot use interrupt-driven updates.
     default: 12
 
+  idle-suspend-timeout-ms:
+    type: int
+    description: |
+      How long polling mode keeps reading the IQS5xx after the last keyboard or
+      trackpad activity. Set to 0 to keep polling forever.
+    default: 300000
+
   scroll-divisor:
     type: int
     description: |

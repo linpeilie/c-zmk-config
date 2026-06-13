@@ -163,6 +163,7 @@ struct iqs5xx_config {
     uint16_t startup_probe_timeout_ms;
     uint16_t startup_probe_interval_ms;
     uint16_t poll_interval_ms;
+    uint32_t idle_suspend_timeout_ms;
     uint16_t scroll_divisor;
     uint16_t movement_divisor;
 
@@ -191,8 +192,10 @@ struct iqs5xx_data {
     bool tap_drag_candidate;
     bool tap_drag_active;
     bool suppress_next_single_tap;
+    bool poll_paused;
     uint32_t last_tap_ms;
     uint32_t suppress_single_tap_ms;
+    uint32_t last_activity_ms;
     int16_t tap_drag_x_acc;
     int16_t tap_drag_y_acc;
     // Scroll accumulators.
